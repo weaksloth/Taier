@@ -18,6 +18,7 @@
 
 package com.dtstack.taier.datasource.plugin.dm;
 
+import com.dtstack.taier.datasource.api.utils.DBUtil;
 import com.dtstack.taier.datasource.plugin.rdbms.AbsRdbmsClient;
 import com.dtstack.taier.datasource.plugin.rdbms.ConnFactory;
 import com.dtstack.taier.datasource.api.downloader.IDownloader;
@@ -31,6 +32,9 @@ import com.dtstack.taier.datasource.api.source.DataSourceType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.regex.Matcher;
@@ -120,6 +124,30 @@ public class DmClient extends AbsRdbmsClient {
     @Override
     protected String getVersionSql() {
         return SHOW_VERSION;
+    }
+
+    /**
+     * 获取达梦数据库下的所有schema
+     * @param source   数据源信息
+     * @param queryDTO 查询信息
+     * @return
+     */
+    @Override
+    public List<String> getAllDatabases(ISourceDTO source, SqlQueryDTO queryDTO) {
+        List<String> result = new ArrayList<>();
+        Connection connection = getCon(source);
+        ResultSet rs = null;
+        try {
+            rs = connection.getMetaData().getSchemas();
+            while (rs.next()) {
+                result.add(rs.getString(1));
+            }
+        }catch (Exception e) {
+            throw new SourceException("get all database from dmdb fail.");
+        }finally {
+            DBUtil.closeDBResources(rs, null, connection);
+        }
+        return result;
     }
 
     /**
