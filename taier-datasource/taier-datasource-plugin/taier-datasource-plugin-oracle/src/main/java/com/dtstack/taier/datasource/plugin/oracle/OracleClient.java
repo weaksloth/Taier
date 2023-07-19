@@ -273,15 +273,23 @@ public class OracleClient extends AbsRdbmsClient {
             while (rs.next()) {
                 ColumnMetaDTO cmDTO = new ColumnMetaDTO();
                 cmDTO.setKey(rs.getString(4));
-                cmDTO.setType(dealNumberType(rs.getString(6), rs));
-                // 获取字段精度
+                cmDTO.setType(rs.getString(6));
+                // 获取数值类型的字段精度
                 if (cmDTO.getType().equalsIgnoreCase("decimal")
                         || cmDTO.getType().equalsIgnoreCase("float")
                         || cmDTO.getType().equalsIgnoreCase("double")
-                        || cmDTO.getType().equalsIgnoreCase("numeric")) {
+                        || cmDTO.getType().equalsIgnoreCase("numeric")
+                        || cmDTO.getType().equalsIgnoreCase("number")) {
                     cmDTO.setPrecision(rs.getInt(7));
                     cmDTO.setScale(rs.getInt(9));
                 }
+
+                // 获取TIMESTAMP字段的精度
+                if(cmDTO.getType().toUpperCase().startsWith("TIMESTAMP")) {
+                    cmDTO.setType("TIMESTAMP");
+                    cmDTO.setPrecision(rs.getInt(9));
+                }
+
                 cmDTO.setPart(false);
                 columns.add(cmDTO);
             }

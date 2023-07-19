@@ -32,8 +32,7 @@ import com.dtstack.taier.datasource.api.source.DataSourceType;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -97,6 +96,52 @@ public class DmClient extends AbsRdbmsClient {
     }
 
     @Override
+    public List<ColumnMetaDTO> getColumnMetaData(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
+        Connection connection = getCon(sourceDTO, queryDTO);
+        RdbmsSourceDTO rdbmsSourceDTO = (RdbmsSourceDTO) sourceDTO;
+        Statement statement = null;
+        ResultSet rs = null;
+        List<ColumnMetaDTO> columns = new ArrayList<>();
+        try {
+            statement = connection.createStatement();
+            statement.setMaxRows(1);
+            String queryColumnSql = getQueryColumnSql(queryDTO, rdbmsSourceDTO);
+            rs = statement.executeQuery(queryColumnSql);
+            ResultSetMetaData rsMetaData = rs.getMetaData();
+            for (int i = 0, len = rsMetaData.getColumnCount(); i < len; i++) {
+                ColumnMetaDTO columnMetaDTO = new ColumnMetaDTO();
+                columnMetaDTO.setKey(rsMetaData.getColumnName(i + 1));
+                columnMetaDTO.setType(doDealType(rsMetaData, i));
+                columnMetaDTO.setPart(false);
+                // 获取字段精度，包括number类型
+                if (columnMetaDTO.getType().equalsIgnoreCase("decimal")
+                        || columnMetaDTO.getType().equalsIgnoreCase("float")
+                        || columnMetaDTO.getType().equalsIgnoreCase("double")
+                        || columnMetaDTO.getType().equalsIgnoreCase("numeric")
+                        || columnMetaDTO.getType().equalsIgnoreCase("number")) {
+                    columnMetaDTO.setScale(rsMetaData.getScale(i + 1));
+                    columnMetaDTO.setPrecision(rsMetaData.getPrecision(i + 1));
+                }
+
+                // 获取TIMESTAMP字段的精度，因为flink需要timestamp(p)类型，所以将scale设置为precision
+                if (columnMetaDTO.getType().toUpperCase().startsWith("TIMESTAMP")) {
+                    columnMetaDTO.setType("TIMESTAMP");
+                    columnMetaDTO.setPrecision(rs.getMetaData().getScale(i + 1));
+                }
+
+                columns.add(columnMetaDTO);
+            }
+        } catch (SQLException e) {
+            throw new SourceException(String.format("Failed to get the meta information of the fields of the table: %s. Please contact the DBA to check the database and table information: %s",
+                    queryDTO.getTableName(), e.getMessage()), e);
+        } finally {
+            com.dtstack.taier.datasource.plugin.common.utils.DBUtil.closeDBResources(rs, statement, connection);
+        }
+
+        return columns;
+    }
+
+    @Override
     public IDownloader getDownloader(ISourceDTO source, SqlQueryDTO queryDTO) throws Exception {
         DmSourceDTO dmSourceDTO = (DmSourceDTO) source;
         DmDownloader dmDownloader = new DmDownloader(getCon(dmSourceDTO), queryDTO.getSql(), dmSourceDTO.getSchema());
@@ -107,8 +152,8 @@ public class DmClient extends AbsRdbmsClient {
     @Override
     public String getCreateTableSql(ISourceDTO source, SqlQueryDTO queryDTO) {
         DmSourceDTO dmSourceDTO = (DmSourceDTO) source;
-        queryDTO.setSql(String.format(CREATE_TABLE_SQL,queryDTO.getTableName(), dmSourceDTO.getSchema()));
-        return super.getCreateTableSql(source,queryDTO);
+        queryDTO.setSql(String.format(CREATE_TABLE_SQL, queryDTO.getTableName(), dmSourceDTO.getSchema()));
+        return super.getCreateTableSql(source, queryDTO);
     }
 
     @Override
@@ -128,6 +173,7 @@ public class DmClient extends AbsRdbmsClient {
 
     /**
      * 获取达梦数据库下的所有schema
+     *
      * @param source   数据源信息
      * @param queryDTO 查询信息
      * @return
@@ -142,9 +188,9 @@ public class DmClient extends AbsRdbmsClient {
             while (rs.next()) {
                 result.add(rs.getString(1));
             }
-        }catch (Exception e) {
+        } catch (Exception e) {
             throw new SourceException("get all database from dmdb fail.");
-        }finally {
+        } finally {
             DBUtil.closeDBResources(rs, null, connection);
         }
         return result;
@@ -171,7 +217,7 @@ public class DmClient extends AbsRdbmsClient {
             log.info("schema is null，get all table！");
             searchSql = queryDTO.getView() ? String.format(SHOW_ALL_TABLE_SQL + SHOW_ALL_VIEW_SQL, tableConstr, viewConstr) : String.format(SHOW_ALL_TABLE_SQL, tableConstr);
         } else {
-            searchSql = queryDTO.getView() ?  String.format(SHOW_TABLE_BY_SCHEMA_SQL + SHOW_VIEW_BY_SCHEMA_SQL, schema, tableConstr, schema, viewConstr) : String.format(SHOW_TABLE_BY_SCHEMA_SQL, schema, tableConstr);
+            searchSql = queryDTO.getView() ? String.format(SHOW_TABLE_BY_SCHEMA_SQL + SHOW_VIEW_BY_SCHEMA_SQL, schema, tableConstr, schema, viewConstr) : String.format(SHOW_TABLE_BY_SCHEMA_SQL, schema, tableConstr);
         }
         log.info("current used schema：{}", schema);
 
