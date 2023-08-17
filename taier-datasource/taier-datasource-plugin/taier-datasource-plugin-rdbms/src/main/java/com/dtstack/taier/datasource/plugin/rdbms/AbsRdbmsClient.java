@@ -302,6 +302,26 @@ public abstract class AbsRdbmsClient implements IClient {
     }
 
     /**
+     * get table's primary keys
+     * @param connection
+     * @param queryDTO
+     * @return primary key list
+     */
+    protected List<String> getPrimaryKeys(Connection connection, SqlQueryDTO queryDTO) {
+        List<String> primaryKeyList = new ArrayList<>();
+        try {
+            ResultSet primaryKeys = connection.getMetaData().getPrimaryKeys(null, queryDTO.getSchema(), queryDTO.getTableName());
+            while(primaryKeys.next()) {
+                primaryKeyList.add(primaryKeys.getString("COLUMN_NAME"));
+            }
+        } catch (SQLException e) {
+            throw new SourceException(String.format("Get table primary key exception：%s", e.getMessage()), e);
+        }
+        return primaryKeyList;
+    }
+
+
+    /**
      * 执行 sql , 执行结束后关闭 connection
      *
      * @param connection jdbc 链接
@@ -526,6 +546,10 @@ public abstract class AbsRdbmsClient implements IClient {
         RdbmsSourceDTO rdbmsSourceDTO = (RdbmsSourceDTO) sourceDTO;
         Statement statement = null;
         ResultSet rs = null;
+
+        // get primary key
+        List<String> primaryKeyList = getPrimaryKeys(connection, queryDTO);
+
         List<ColumnMetaDTO> columns = new ArrayList<>();
         try {
             statement = connection.createStatement();
@@ -546,7 +570,7 @@ public abstract class AbsRdbmsClient implements IClient {
                     columnMetaDTO.setScale(rsMetaData.getScale(i + 1));
                     columnMetaDTO.setPrecision(rsMetaData.getPrecision(i + 1));
                 }
-
+                columnMetaDTO.setPrimaryKey(primaryKeyList.contains(columnMetaDTO.getKey()));
                 columns.add(columnMetaDTO);
             }
         } catch (SQLException e) {

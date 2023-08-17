@@ -270,6 +270,8 @@ public class OracleClient extends AbsRdbmsClient {
                      .getMetaData()
                      .getColumns(null, tableInfo.getSchema(), tableInfo.getTable(), null)) {
 
+            List<String> primaryKeyList = getPrimaryKeys(connection, queryDTO);
+
             while (rs.next()) {
                 ColumnMetaDTO cmDTO = new ColumnMetaDTO();
                 cmDTO.setKey(rs.getString(4));
@@ -291,6 +293,7 @@ public class OracleClient extends AbsRdbmsClient {
                 }
 
                 cmDTO.setPart(false);
+                cmDTO.setPrimaryKey(primaryKeyList.contains(cmDTO.getKey()));
                 columns.add(cmDTO);
             }
         } catch (Exception e) {

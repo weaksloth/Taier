@@ -57,4 +57,9 @@ public class ColumnMetaDTO {
      * 指定列的指定列大小
      */
     private Integer precision;
+
+    /**
+     * 是否为主键
+     */
+    private Boolean primaryKey;
 }
