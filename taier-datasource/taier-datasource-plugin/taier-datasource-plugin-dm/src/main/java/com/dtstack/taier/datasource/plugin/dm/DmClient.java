@@ -104,6 +104,7 @@ public class DmClient extends AbsRdbmsClient {
 
         // get primary key
         List<String> primaryKeyList = getPrimaryKeys(connection, queryDTO);
+        List<String> nullableKeys = getNullableKeys(connection, queryDTO);
 
         List<ColumnMetaDTO> columns = new ArrayList<>();
         try {
@@ -118,6 +119,7 @@ public class DmClient extends AbsRdbmsClient {
                 columnMetaDTO.setType(doDealType(rsMetaData, i));
                 columnMetaDTO.setPart(false);
                 columnMetaDTO.setPrimaryKey(primaryKeyList.contains(columnMetaDTO.getKey()));
+                columnMetaDTO.setNullable(nullableKeys.contains(columnMetaDTO.getKey()));
                 // 获取字段精度，包括number类型
                 if (columnMetaDTO.getType().equalsIgnoreCase("decimal")
                         || columnMetaDTO.getType().equalsIgnoreCase("float")

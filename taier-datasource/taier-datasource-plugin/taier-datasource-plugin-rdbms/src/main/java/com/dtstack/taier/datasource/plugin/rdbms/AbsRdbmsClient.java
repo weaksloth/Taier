@@ -320,6 +320,27 @@ public abstract class AbsRdbmsClient implements IClient {
         return primaryKeyList;
     }
 
+    /**
+     * get table's nullable keys
+     * @param connection
+     * @param queryDTO
+     * @return nullable key list
+     */
+    protected List<String> getNullableKeys(Connection connection, SqlQueryDTO queryDTO) {
+        List<String> nullableColumnList = new ArrayList<>();
+        try {
+            ResultSet columns = connection.getMetaData().getColumns(null, queryDTO.getSchema(), queryDTO.getTableName(), null);
+            while(columns.next()) {
+                if(!"NO".equals(columns.getString("IS_NULLABLE"))) {
+                    nullableColumnList.add(columns.getString("COLUMN_NAME"));
+                }
+            }
+        } catch (SQLException e) {
+            throw new SourceException(String.format("Get table nullable column exception：%s", e.getMessage()), e);
+        }
+        return nullableColumnList;
+    }
+
 
     /**
      * 执行 sql , 执行结束后关闭 connection
@@ -547,8 +568,9 @@ public abstract class AbsRdbmsClient implements IClient {
         Statement statement = null;
         ResultSet rs = null;
 
-        // get primary key
+        // get primary key and nullable column info
         List<String> primaryKeyList = getPrimaryKeys(connection, queryDTO);
+        List<String> nullableColumnList = getNullableKeys(connection, queryDTO);
 
         List<ColumnMetaDTO> columns = new ArrayList<>();
         try {
@@ -571,6 +593,7 @@ public abstract class AbsRdbmsClient implements IClient {
                     columnMetaDTO.setPrecision(rsMetaData.getPrecision(i + 1));
                 }
                 columnMetaDTO.setPrimaryKey(primaryKeyList.contains(columnMetaDTO.getKey()));
+                columnMetaDTO.setNullable(nullableColumnList.contains(columnMetaDTO.getKey()));
                 columns.add(columnMetaDTO);
             }
         } catch (SQLException e) {

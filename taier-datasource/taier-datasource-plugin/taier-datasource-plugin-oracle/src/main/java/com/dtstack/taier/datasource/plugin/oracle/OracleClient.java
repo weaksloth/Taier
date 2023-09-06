@@ -271,6 +271,7 @@ public class OracleClient extends AbsRdbmsClient {
                      .getColumns(null, tableInfo.getSchema(), tableInfo.getTable(), null)) {
 
             List<String> primaryKeyList = getPrimaryKeys(connection, queryDTO);
+            List<String> nullableKeyList = getNullableKeys(connection, queryDTO);
 
             while (rs.next()) {
                 ColumnMetaDTO cmDTO = new ColumnMetaDTO();
@@ -294,6 +295,7 @@ public class OracleClient extends AbsRdbmsClient {
 
                 cmDTO.setPart(false);
                 cmDTO.setPrimaryKey(primaryKeyList.contains(cmDTO.getKey()));
+                cmDTO.setNullable(nullableKeyList.contains(cmDTO.getKey()));
                 columns.add(cmDTO);
             }
         } catch (Exception e) {

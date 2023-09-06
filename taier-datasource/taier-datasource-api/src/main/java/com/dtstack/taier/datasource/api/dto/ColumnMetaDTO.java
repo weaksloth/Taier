@@ -62,4 +62,9 @@ public class ColumnMetaDTO {
      * 是否为主键
      */
     private Boolean primaryKey;
+
+    /**
+     * 是否可以为空
+     */
+    private Boolean nullable;
 }
