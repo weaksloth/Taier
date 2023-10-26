@@ -49,13 +49,8 @@ import java.util.Objects;
  */
 public class GreenplumClient extends AbsRdbmsClient {
 
-    private static final String TABLE_QUERY = "SELECT relname from pg_class a,pg_namespace b where relname not like " +
-            "'%%prt%%' and relkind ='r'  and a.relnamespace=b.oid and  nspname = '%s';";
-
-    private static final String TABLE_QUERY_WITHOUT_SCHEMA = "\n" +
-            "select table_schema ||'.'||table_name as tableName from information_schema.tables where table_schema in " +
-            "(SELECT n.nspname AS \"Name\"  FROM pg_catalog.pg_namespace n WHERE n.nspname !~ '^pg_' AND n.nspname <>" +
-            " 'gp_toolkit' AND n.nspname <> 'information_schema' ORDER BY 1)";
+    private static final String TABLE_QUERY = "SELECT psut.relname FROM pg_statio_user_tables psut LEFT JOIN pg_inherits pi ON psut.relid = pi.inhrelid\n" +
+            "WHERE schemaname='%s' AND pi.inhparent IS NULL;";
 
     private static final String TABLE_COMMENT_QUERY = "select de.description\n" +
             "          from (select pc.oid as ooid,pn.nspname,pc.*\n" +
@@ -151,8 +146,12 @@ public class GreenplumClient extends AbsRdbmsClient {
 
     @Override
     public List<String> getTableList(ISourceDTO sourceDTO, SqlQueryDTO queryDTO) {
-        Connection connection = getCon(sourceDTO);
-        Greenplum6SourceDTO greenplum6SourceDTO = (Greenplum6SourceDTO) sourceDTO;
+        return this.getTableListBySchema(sourceDTO, queryDTO);
+    }
+
+    @Override
+    public List<String> getTableListBySchema(ISourceDTO source, SqlQueryDTO queryDTO) {
+        Connection connection = getCon(source);
 
         Statement statement = null;
         ResultSet resultSet = null;
@@ -160,17 +159,17 @@ public class GreenplumClient extends AbsRdbmsClient {
         try {
             statement = connection.createStatement();
             DBUtil.setFetchSize(statement, queryDTO);
-            if (StringUtils.isBlank(greenplum6SourceDTO.getSchema())) {
-                resultSet = statement.executeQuery(TABLE_QUERY_WITHOUT_SCHEMA);
+            if (StringUtils.isBlank(queryDTO.getSchema())) {
+                throw new SourceException("Not Support");
             } else {
-                resultSet = statement.executeQuery(String.format(TABLE_QUERY, greenplum6SourceDTO.getSchema()));
+                resultSet = statement.executeQuery(String.format(TABLE_QUERY, queryDTO.getSchema()));
             }
             while (resultSet.next()) {
                 tableList.add(resultSet.getString(1));
             }
         } catch (SQLException e) {
             throw new SourceException(String.format("get table: %s's information error. Please contact the DBA to check the database、table information.",
-                    greenplum6SourceDTO.getSchema()), e);
+                    queryDTO.getSchema()), e);
         } finally {
             DBUtil.closeDBResources(resultSet, statement, connection);
         }
