@@ -18,6 +18,7 @@
 
 package com.dtstack.taier.datasource.plugin.oracle;
 
+import com.dtstack.taier.datasource.api.dto.ProcedureMetaDto;
 import com.dtstack.taier.datasource.plugin.common.base.InsideTable;
 import com.dtstack.taier.datasource.plugin.common.utils.ColumnUtil;
 import com.dtstack.taier.datasource.plugin.common.utils.DBUtil;
@@ -42,17 +43,8 @@ import org.apache.commons.collections.CollectionUtils;
 import org.apache.commons.collections.MapUtils;
 import org.apache.commons.lang3.StringUtils;
 
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.ResultSetMetaData;
-import java.sql.SQLException;
-import java.sql.Statement;
-import java.sql.Types;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.sql.*;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -192,7 +184,58 @@ public class OracleClient extends AbsRdbmsClient {
         }
     }
 
-    private void setScaleAndPrecision(ColumnMetaDTO columnMetaDTO, int columnType, ResultSetMetaData rsMetaData,int index) throws SQLException {
+    @Override
+    public List<ProcedureMetaDto> getProcedureMetaData(ISourceDTO source, SqlQueryDTO queryDTO) {
+        List<ProcedureMetaDto> procedureMetaDtoList = new ArrayList<>();
+        Connection connection = getCon(source);
+        ResultSet rs = null;
+        try {
+            List<String> procedureList = new ArrayList<>();
+            DatabaseMetaData metaData = connection.getMetaData();
+            rs = metaData.getProcedures(null,
+                    queryDTO.getSchema(),
+                    Optional.ofNullable(queryDTO.getTableNamePattern()).orElse("%"));
+
+            while (rs.next()) {
+                procedureList.add(rs.getString(3));     // the third column means procedure name
+            }
+
+            for(String procedureName : procedureList) {
+
+                ProcedureMetaDto procedureMetaDto = new ProcedureMetaDto();
+                procedureMetaDto.setProcedureName(procedureName);
+                List<ProcedureMetaDto.ParameterMetaDto> parameterMetaDtos = new ArrayList<>();
+
+                rs = metaData.getProcedureColumns(null, queryDTO.getSchema(), procedureName, null);
+                while(rs.next()) {
+                    String parameterName = rs.getString("COLUMN_NAME");
+                    String columnType = rs.getString("COLUMN_TYPE");
+                    String typeName = rs.getString("TYPE_NAME");
+                    int precision = rs.getInt("PRECISION");
+                    int scale = rs.getInt("SCALE");
+                    ProcedureMetaDto.ParameterMetaDto parameterMetaDto = new ProcedureMetaDto.ParameterMetaDto(
+                            parameterName, columnType, typeName, precision, scale
+                    );
+                    parameterMetaDtos.add(parameterMetaDto);
+                }
+
+                procedureMetaDto.setParameterMetaDtoList(parameterMetaDtos);
+                procedureMetaDtoList.add(procedureMetaDto);
+            }
+
+        }catch (SQLException e) {
+            throw new SourceException(String.format(
+                    "Failed to get the meta information of the fields of the table: %s. " +
+                            "Please contact the DBA to check the database and table information: %s",
+                    queryDTO.getTableName(), e.getMessage()), e);
+        }finally {
+            DBUtil.closeDBResources(rs, null, connection);
+        }
+
+        return procedureMetaDtoList;
+    }
+
+    private void setScaleAndPrecision(ColumnMetaDTO columnMetaDTO, int columnType, ResultSetMetaData rsMetaData, int index) throws SQLException {
         if (columnMetaDTO.getType().equalsIgnoreCase("decimal")
                 || columnMetaDTO.getType().equalsIgnoreCase("float")
                 || columnMetaDTO.getType().equalsIgnoreCase("double")

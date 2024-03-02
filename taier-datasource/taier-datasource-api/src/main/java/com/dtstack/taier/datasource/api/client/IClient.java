@@ -20,12 +20,7 @@ package com.dtstack.taier.datasource.api.client;
 
 import com.dtstack.taier.datasource.api.base.Client;
 import com.dtstack.taier.datasource.api.downloader.IDownloader;
-import com.dtstack.taier.datasource.api.dto.ColumnMetaDTO;
-import com.dtstack.taier.datasource.api.dto.Database;
-import com.dtstack.taier.datasource.api.dto.SqlQueryDTO;
-import com.dtstack.taier.datasource.api.dto.Table;
-import com.dtstack.taier.datasource.api.dto.TableInfo;
-import com.dtstack.taier.datasource.api.dto.WriteFileDTO;
+import com.dtstack.taier.datasource.api.dto.*;
 import com.dtstack.taier.datasource.api.dto.source.ISourceDTO;
 
 import java.sql.Connection;
@@ -171,6 +166,16 @@ public interface IClient extends Client {
      * @return b表字段属性
      */
     List<ColumnMetaDTO> getFlinkColumnMetaData(ISourceDTO source, SqlQueryDTO queryDTO);
+
+
+    /**
+     * 获取存储过程元数据信息
+     *
+     * @param source    数据源信息
+     * @param queryDTO  查询条件
+     * @return 存储过程元数据
+     */
+    List<ProcedureMetaDto> getProcedureMetaData(ISourceDTO source, SqlQueryDTO queryDTO);
 
     /**
      * 获取 flinkSql 需要的字段名称(做了部分转换, 为实时计算中特殊使用)
